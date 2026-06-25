@@ -1,0 +1,38 @@
+name: Deploy brochure.safetywithus.com to VPS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:   # allows manual runs from the Actions tab
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (vite → dist/)
+        run: npm run build
+
+      - name: Deploy dist/ to VPS via rsync
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          echo "$SSH_KEY" > deploy_key
+          chmod 600 deploy_key
+          rsync -avz --delete \
+            -e "ssh -i deploy_key -o StrictHostKeyChecking=no -p ${{ secrets.VPS_PORT }}" \
+            dist/ \
+            "${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }}:/var/www/brochure.safetywithus.com/public_html/"
+          rm -f deploy_key
